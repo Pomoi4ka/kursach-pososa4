@@ -1,0 +1,4 @@
+perf.data*
+main
+main_omp
+input.txt
