@@ -380,6 +380,11 @@ static size_t mat_pivot_row(const float es[], size_t rows, size_t cols,
 static inline size_t mat_reduce(float es[], size_t rows, size_t cols, float tol)
 {
     size_t pivots = 0;
+
+    // Я бы мог запихнуть es, rows, cols в структуру, но компилятор слишком
+    // тупой чтобы увидеть, что у меня размер массивов весзде известен и
+    // swap можно скопилить через пару инструкций, а не делать целый цикл
+    // копирующий по одному float.
     for (size_t row = 0, col = 0; col < cols && row < rows; ++col) {
         size_t sel = mat_pivot_row(es, rows, cols, row, col);
         float pivot = es[cols * sel + col];
