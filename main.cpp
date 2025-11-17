@@ -355,9 +355,10 @@ bool rectf::has_point(pointf a) const
         float &alpha = xs[0], &beta = xs[1];
 
         bool exist = mat_solve_sys(*ctx, es[i], xs, rows, cols, TOLERANCE);
-        if (exist && alpha >= 0 - ctx->eps && beta >= 0 - ctx->eps
-            && alpha + beta <= 1 + ctx->eps)
-            return true;
+        if (!exist)                                continue;
+        if (alpha < -ctx->eps || beta < -ctx->eps) continue;
+        if (alpha + beta > 1 + ctx->eps)           continue;
+        return true;
     }
     return false;
 }
@@ -433,19 +434,14 @@ static bool mat_solve_homogeneous_sys(comp_ctx &ctx, float es[], float ans[],
                                       size_t rows, size_t cols, float tol)
 {
     int pivots = mat_reduce(es, rows, cols, tol);
-    int free_cols = 0;
+    int free_cols = cols - pivots;
 
-    free_cols = cols - pivots;
-
-    for (size_t i = 0; i < cols; ++i) {
-        ans[i] = 0.0;
-    }
+    for (size_t i = 0; i < cols; ++i) ans[i] = 0.0;
 
     for (size_t i = cols - free_cols; i < cols; ++i) {
         ans[i] = 1.0;
-        for (int j = 0; j < pivots; ++j) {
+        for (int j = 0; j < pivots; ++j)
             ans[j] += -es[cols * j + i];
-        }
     }
 
     return !free_cols;
@@ -455,7 +451,7 @@ static void swap(void *x, void *y, size_t n)
 {
     char *a = reinterpret_cast<char *>(x);
     char *b = reinterpret_cast<char *>(y);
-    char t, *end = a + n;
+    char  t, *end = a + n;
     while (a != end) t = *a, *a = *b, *b = t, ++b, ++a;
 }
 
@@ -471,8 +467,7 @@ static void quicksort_impl(void *items, size_t size, long low,
 
     for (;;) {
         do lo += size; while (cmp(cmp_ctx, xs + lo, pivot) < 0);
-        if (hi) do hi -= size;
-            while (hi && cmp(cmp_ctx, xs + hi, pivot) > 0);
+        if (hi) do hi -= size; while (hi && cmp(cmp_ctx, xs + hi, pivot) > 0);
         if (lo >= hi) break;
         swap(xs + lo, xs + hi, size);
     }
@@ -535,11 +530,9 @@ line_coeff::from_points(comp_ctx *ctx, pointf p1, pointf p2)
     const size_t rows = sizeof es / sizeof *es;
     const size_t cols = sizeof *es / sizeof **es;
 
-    mat_solve_homogeneous_sys
-        (*ctx, (float *)es, (float *)&line, rows, cols, TOLERANCE);
-
+    mat_solve_homogeneous_sys(*ctx, (float *)es, (float *)&line,
+                              rows, cols, TOLERANCE);
     line.ctx = ctx;
-
     return line;
 }
 
