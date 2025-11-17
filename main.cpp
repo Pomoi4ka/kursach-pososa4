@@ -695,7 +695,7 @@ static bool find_max_intersect_area(comp_ctx &ctx, rectf_list const &rs,
     omp_init_lock(&lock);
 
 #pragma omp target teams distribute parallel for    \
-    map(from: max_area, ids)
+    map(from: max_area, ids) schedule(guided)
 #endif
     for (size_t i = 0; i < rs.count; ++i) {
         for (size_t j = i + 1; j < rs.count; ++j) {
