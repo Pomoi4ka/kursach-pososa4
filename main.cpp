@@ -478,7 +478,7 @@ static void quicksort_impl(void *items, size_t size, long low,
 }
 
 static void quicksort(void *xs, size_t x_size, size_t x_count,
-               compar_f cmp, void *cmp_ctx)
+                      compar_f cmp, void *cmp_ctx)
 {
     quicksort_impl(xs, x_size, 0, x_count * x_size, cmp, cmp_ctx);
 }
@@ -507,31 +507,30 @@ static void sort_points_clockwise(pointf ps[], size_t n)
 
 bool line_coeff::intersection(line_coeff l, pointf &p)
 {
-    float es[][3] = {
-        {k  , b  , -c  },
-        {l.k, l.b, -l.c}
+    const size_t rows = 2;
+    const size_t cols = 3;
+
+    float es[] = {
+        k  , b  , -c  ,
+        l.k, l.b, -l.c
     };
 
-    const size_t rows = sizeof es / sizeof *es;
-    const size_t cols = sizeof *es / sizeof **es;
-
-    return mat_solve_sys(*ctx, (float *)es, (float *)&p, rows, cols, TOLERANCE);
+    return mat_solve_sys(*ctx, es, (float *)&p, rows, cols, TOLERANCE);
 }
 
-line_coeff
-line_coeff::from_points(comp_ctx *ctx, pointf p1, pointf p2)
+line_coeff line_coeff::from_points(comp_ctx *ctx, pointf p1, pointf p2)
 {
     line_coeff line;
-    float es[][3] = {
+
+    const size_t rows = 2;
+    const size_t cols = 3;
+
+    float es[] = {
         {p1.x, p1.y, 1},
         {p2.x, p2.y, 1},
     };
 
-    const size_t rows = sizeof es / sizeof *es;
-    const size_t cols = sizeof *es / sizeof **es;
-
-    mat_solve_homogeneous_sys(*ctx, (float *)es, (float *)&line,
-                              rows, cols, TOLERANCE);
+    mat_solve_homogeneous_sys(*ctx, es, (float *)&line, rows, cols, TOLERANCE);
     line.ctx = ctx;
     return line;
 }
@@ -602,8 +601,7 @@ static void add_rect(comp_ctx &c, pointf_list const &ps,
     rs.add(r);
 }
 
-static void
-find_rects(comp_ctx &ccx, pointf_list const &ps, rectf_list &rs)
+static void find_rects(comp_ctx &ccx, pointf_list const &ps, rectf_list &rs)
 {
 #ifdef _OPENMP
     if (TRACE) {
@@ -641,8 +639,7 @@ static void file_problem_err(const char *path)
     std::cerr << "ОШИБКА: Проблема с файлом " << path << std::endl;
 }
 
-static bool
-read_input_file(const char *path, comp_ctx &ctx, pointf_list &ps)
+static bool read_input_file(const char *path, comp_ctx &ctx, pointf_list &ps)
 {
     std::ifstream f(path);
     if (!f.is_open()) {
@@ -676,9 +673,8 @@ read_input_file(const char *path, comp_ctx &ctx, pointf_list &ps)
     return true;
 }
 
-static bool
-find_max_intersect_area(comp_ctx &ctx, rectf_list const &rs,
-                        pair_index ids)
+static bool find_max_intersect_area(comp_ctx &ctx, rectf_list const &rs,
+                                    pair_index ids)
 {
     const size_t MIN_RECT_COUNT = 2;
     if (rs.count < MIN_RECT_COUNT) {
