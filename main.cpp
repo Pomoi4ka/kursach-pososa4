@@ -30,7 +30,6 @@ static bool mat_solve_sys(struct comp_ctx &ctx, float es[], float ans[],
 struct comp_ctx {
     std::ofstream *prot;
     float eps;
-    int trace_level;
 
     short level;
     short pad;
@@ -734,45 +733,8 @@ static void print_verts(rectf_list const &rects, pair_index max)
     }
 }
 
-static const char *shift_args(int &argc, const char **&argv)
+int main()
 {
-    if (!argc) return NULL;
-    return argc--, *argv++;
-}
-
-static void usage(const char *program)
-{
-    std::cout << "Использование: " << program << " [ФЛАГИ]"
-              << std::endl;
-    std::cout << "ФЛАГИ:" << std::endl;
-    std::cout << "   -i <имя входного файла>      "
-        "Имя входного файла (по умолчанию \"input.txt\")"
-              << std::endl;
-    if (TRACE) {
-        std::cout << "   -l <число>                   "
-            "Уровень трассировки (0: стадии программы, 1: "
-            "вызовы функций, 2: вычисления функций)"
-                  << std::endl;
-    }
-}
-
-static bool cstreq(const char *a, const char *b)
-{
-    while (*a == *b && *a && *b) a++, b++;
-    return *a == *b;
-}
-
-static int cstr2num(const char *cstr)
-{
-    int d = 0;
-    while ('0' <= *cstr && *cstr <= '9')
-        d = *cstr++ - '0' + d * 10;
-    return d;
-}
-
-int main(int argc, const char **argv)
-{
-    const char *arg, *program;
     const char *input = "input.txt", *prot_path = "protocol.txt";
 
     std::ofstream prot;
@@ -780,28 +742,6 @@ int main(int argc, const char **argv)
     pointf_list points = {};
     rectf_list rects = {};
     pair_index max;
-
-    ctx.trace_level = 3;
-
-    program = shift_args(argc, argv);
-    while ((arg = shift_args(argc, argv))) {
-        if (cstreq(arg, "-h")) {
-            usage(program);
-            return 0;
-        } else if (cstreq(arg, "-i")) {
-            input = shift_args(argc, argv);
-            if (input) continue;
-            std::cerr << "Пропущен аргумент для -i" << std::endl;
-            return 1;
-        } else if (TRACE && cstreq(arg, "-l")) {
-            arg = shift_args(argc, argv);
-            if (!arg) {
-                std::cerr << "Пропущен аргумент для -l" << std::endl;
-                return 1;
-            }
-            ctx.trace_level = cstr2num(arg);
-        }
-    }
 
 #ifdef _OPENMP
     omp_init_lock(&rects.lock);
