@@ -378,7 +378,7 @@ static size_t mat_pivot_row(const float es[], size_t rows, size_t cols,
     return mi;
 }
 
-static inline size_t mat_reduce(float es[], size_t rows, size_t cols, float tol)
+static size_t mat_reduce(float es[], size_t rows, size_t cols, float tol)
 {
     size_t pivots = 0;
 
