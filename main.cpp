@@ -695,7 +695,10 @@ find_max_intersect_area(comp_ctx &ctx, rectf_list const &rs,
     ids[1] = 1;
 
 #ifdef _OPENMP
-#pragma omp target teams distribute parallel for \
+    omp_lock_t lock;
+    omp_init_lock(&lock);
+
+#pragma omp target teams distribute parallel for    \
     map(from: max_area, ids)
 #endif
     for (size_t i = 0; i < rs.count; ++i) {
@@ -706,11 +709,17 @@ find_max_intersect_area(comp_ctx &ctx, rectf_list const &rs,
             if (n <= 2) continue;
             sort_points_clockwise(points, n);
             float area = polygon_area(points, n);
+#ifdef _OPENMP
+            omp_set_lock(&lock);
+#endif
             if (area > max_area) {
-                 max_area = area;
+                max_area = area;
                 ids[0] = i;
                 ids[1] = j;
             }
+#ifdef _OPENMP
+            omp_unset_lock(&lock);
+#endif
         }
     }
     return true;
