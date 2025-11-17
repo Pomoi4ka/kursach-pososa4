@@ -526,8 +526,8 @@ line_coeff line_coeff::from_points(comp_ctx *ctx, pointf p1, pointf p2)
     const size_t cols = 3;
 
     float es[] = {
-        {p1.x, p1.y, 1},
-        {p2.x, p2.y, 1},
+        p1.x, p1.y, 1,
+        p2.x, p2.y, 1,
     };
 
     mat_solve_homogeneous_sys(*ctx, es, (float *)&line, rows, cols, TOLERANCE);
