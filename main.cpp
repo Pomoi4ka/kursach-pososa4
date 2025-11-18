@@ -20,7 +20,6 @@ typedef int (*compar_f)(void *, const void *, const void *);
 static void swap(void *x, void *y, size_t n);
 static void quicksort(void *xs, size_t x_size, size_t x_count,
                compar_f cmp, void *cmp_ctx);
-static float normalized_atan2(float y, float x);
 static bool mat_solve_homogeneous_sys(struct comp_ctx &ctx, float es[],
                                       float ans[], size_t rows, size_t cols,
                                       float tol);
@@ -124,24 +123,6 @@ pointf pointf::sub(pointf a) const
 {
     pointf result = {x - a.x, y - a.y};
     return result;
-}
-
-static float normalized_atan2(float y, float x)
-{
-    const unsigned sign_mask = 0x80000000;
-    const float b = 0.596227f;
-
-    unsigned ux_s  = sign_mask & (unsigned &)x;
-    unsigned uy_s  = sign_mask & (unsigned &)y;
-
-    float q = (float)((~ux_s & uy_s) >> 29 | ux_s >> 30);
-
-    float bxy_a = fabsf(b * x * y);
-    float num = bxy_a + y * y;
-    float atan_1q =  num / (x * x + bxy_a + num);
-
-    unsigned uatan_2q = (ux_s ^ uy_s) | (unsigned &)atan_1q;
-    return q + (float &)uatan_2q;
 }
 
 void comp_ctx::ln()
@@ -306,10 +287,10 @@ void rectf::clockwisify()
     };
 
     float as[RECT_VERT_COUNT] = {
-        normalized_atan2(vp[0].y, vp[0].x),
-        normalized_atan2(vp[1].y, vp[1].x),
-        normalized_atan2(vp[2].y, vp[2].x),
-        normalized_atan2(vp[3].y, vp[3].x),
+        atan2f(vp[0].y, vp[0].x),
+        atan2f(vp[1].y, vp[1].x),
+        atan2f(vp[2].y, vp[2].x),
+        atan2f(vp[3].y, vp[3].x),
     };
     ctx->func("rectf::clockwisify");
     ctx->write("средняя точка = ");
@@ -494,7 +475,7 @@ static int point_compare_clockwise(void *cx, const void *pp1,
     pointf a = p1.sub(mean);
     pointf b = p2.sub(mean);
 
-    if (normalized_atan2(a.y, a.x) < normalized_atan2(b.y, b.x))
+    if (atan2f(a.y, a.x) < atan2f(b.y, b.x))
         return -1;
     return 1;
 }
