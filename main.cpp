@@ -186,10 +186,15 @@ comp_ctx &comp_ctx::operator<<(size_t x)
     return *this;
 }
 
+std::ostream &operator<<(std::ostream &s, pointf p)
+{
+    return s << "(" << p.x << ", " << p.y << ")";
+}
+
 comp_ctx &comp_ctx::operator<<(pointf p)
 {
     if (!TRACE) return *this;
-    *prot << "(" << p.x << ", " << p.y << ")";
+    *prot << p;
     return *this;
 }
 
@@ -670,8 +675,7 @@ static void print_verts(rectf_dynarr const &rects, pair_index max)
     for (size_t i = 0; i < PAIR_COUNT; ++i) {
         for (size_t j = 0; j < RECT_VERT_COUNT; ++j) {
             if (j > 0) std::cout << " ";
-            pointf p = rects.items[max[i]].vs[j];
-            std::cout << "(" << p.x << ", " << p.y << ")";
+            std::cout << rects.items[max[i]].vs[j];
         }
         std::cout << std::endl;
     }
@@ -689,7 +693,6 @@ int main()
 
 #ifdef _OPENMP
     omp_init_lock(&rects.lock);
-    omp_init_lock(&ctx.lock);
 #endif
 
     if (TRACE) {
