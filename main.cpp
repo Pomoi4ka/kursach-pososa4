@@ -17,23 +17,30 @@ const bool TRACE = false;
 typedef size_t pair_index[PAIR_COUNT];
 typedef int (*compar_f)(void *, const void *, const void *);
 
+struct comp_ctx;
+struct pointf;
+struct rectf;
+
 static void swap(void *x, void *y, size_t n);
 static void quicksort(void *xs, size_t x_size, size_t x_count,
-               compar_f cmp, void *cmp_ctx);
-static bool mat_solve_homogeneous_sys(struct comp_ctx &ctx, float es[],
-                                      float ans[], size_t rows, size_t cols,
-                                      float tol);
-static bool mat_solve_sys(struct comp_ctx &ctx, float es[], float ans[],
+                      compar_f cmp, void *cmp_ctx);
+static bool mat_solve_homogeneous_sys(comp_ctx &ctx, float es[], float ans[],
+                                      size_t rows, size_t cols, float tol);
+static bool mat_solve_sys(comp_ctx &ctx, float es[], float ans[],
                           size_t rows, size_t cols, float tol);
+
+struct ln {} ln;
 
 struct comp_ctx {
     std::ofstream *prot;
     float eps;
 
-    short level;
-    short pad;
-
-    void func(const char *);
+    comp_ctx &operator<<(float);
+    comp_ctx &operator<<(pointf);
+    comp_ctx &operator<<(rectf);
+    comp_ctx &operator<<(const char *);
+    comp_ctx &operator<<(struct ln);
+    comp_ctx &operator<<(size_t);
 };
 
 struct pointf {
@@ -115,7 +122,6 @@ pointf pointf::sub(pointf a) const
     return result;
 }
 
-
 void rectf_dynarr::alloc(size_t n) {
     if (cap > count + n) return;
 
@@ -164,6 +170,53 @@ void pointf_dynarr::alloc(size_t n) {
 void pointf_dynarr::add(pointf p) {
     alloc(1);
     items[count++] = p;
+}
+
+comp_ctx &comp_ctx::operator<<(float f)
+{
+    if (!TRACE) return *this;
+    *prot << f;
+    return *this;
+}
+
+comp_ctx &comp_ctx::operator<<(size_t x)
+{
+    if (!TRACE) return *this;
+    *prot << x;
+    return *this;
+}
+
+comp_ctx &comp_ctx::operator<<(pointf p)
+{
+    if (!TRACE) return *this;
+    *prot << "(" << p.x << ", " << p.y << ")";
+    return *this;
+}
+
+comp_ctx &comp_ctx::operator<<(rectf r)
+{
+    if (!TRACE) return *this;
+    *this << "{";
+    for (size_t i = 0; i < RECT_VERT_COUNT; ++i) {
+        if (i > 0) *this << ", ";
+        *this << r.vs[i];
+    }
+    *this << "}";
+    return *this;
+}
+
+comp_ctx &comp_ctx::operator<<(const char *cstr)
+{
+    if (!TRACE) return *this;
+    *prot << cstr;
+    return *this;
+}
+
+comp_ctx &comp_ctx::operator<<(struct ln)
+{
+    if (!TRACE) return *this;
+    *prot << std::endl;
+    return *this;
 }
 
 pointf mean_point(pointf ps[], size_t n)
@@ -471,12 +524,6 @@ static void add_rect(comp_ctx &c, pointf_dynarr const &ps,
 static void find_rects(comp_ctx &ccx, pointf_dynarr const &ps, rectf_dynarr &rs)
 {
 #ifdef _OPENMP
-    if (TRACE) {
-        std::cerr << "Трассировка при параллельных "
-            "вычслениях невозможна" << std::endl;
-        return;
-    }
-
 #pragma omp target teams distribute parallel for
 #endif
     for (size_t i = 0; i < ps.count; ++i) {
@@ -489,6 +536,13 @@ static void find_rects(comp_ctx &ccx, pointf_dynarr const &ps, rectf_dynarr &rs)
             }
         }
     }
+    ccx << "Среди точек было найдено " << rs.count << " прямоугольник";
+    switch (rs.count % 10) {
+    case 2: case 3: case 4: ccx << "а";
+    case 1: break;
+    default: ccx << "ов"; break;
+    }
+    ccx << ln;
 }
 
 static bool file_read_number(std::ifstream &f, float &x)
@@ -536,14 +590,16 @@ static bool read_input_file(const char *path, comp_ctx &ctx, pointf_dynarr &ps)
 
         for (size_t i = 0; i < sizeof cs / sizeof *cs; ++i) {
             if (file_read_number(f, cs[i])) continue;
-            if (i == 0) return true;
+            if (i == 0) goto done;
             file_problem_err(path, FILE_FMT_ERR);
             return false;
         }
         pointf p = {cs[0], cs[1]};
-
         ps.add(p);
     }
+
+ done:
+    ctx << "Прочитано " << ps.count << " точек" << ln;
 
     return true;
 }
@@ -575,19 +631,30 @@ static bool find_max_intersect_area(comp_ctx &ctx, rectf_dynarr const &rs,
     for (size_t i = 0; i < rs.count; ++i) {
         for (size_t j = i + 1; j < rs.count; ++j) {
             pointf points[64];
-            int n = rs.items[i].intersection_points
-                (rs.items[j], points);
+            rectf &a = rs.items[i], &b = rs.items[j];
+            int n = a.intersection_points(b, points);
             if (n <= 2) continue;
             sort_points_clockwise(points, n);
             float area = polygon_area(points, n);
 #ifdef _OPENMP
             omp_set_lock(&lock);
 #endif
+            ctx << "Для прямоугольников " << a << " и " << b
+                << " были найдены следующие точки пересечения: " << ln;
+            for (int i = 0; i < n; ++i) {
+                if (i > 0) ctx << "," << ln;
+                ctx << "  " << points[i];
+            }
+            ctx << ln << "Площадь полигона состоящего из этих точек: "
+                << area;
+
             if (area > max_area) {
+                ctx << " (новый максимум)";
                 max_area = area;
                 ids[0] = i;
                 ids[1] = j;
             }
+            ctx << ln;
 #ifdef _OPENMP
             omp_unset_lock(&lock);
 #endif
@@ -622,6 +689,7 @@ int main()
 
 #ifdef _OPENMP
     omp_init_lock(&rects.lock);
+    omp_init_lock(&ctx.lock);
 #endif
 
     if (TRACE) {
