@@ -18,6 +18,7 @@ main_pgo: main.cpp main.instr
 	llvm-profdata merge default.profraw -o main_pgo.profdata
 	$(CXX) -fprofile-instr-use=main_pgo.profdata $(CXXFLAGS) $< -o $@
 
+main.instr: OPT_LEVEL = 2
 main.instr: main.cpp
 	$(CXX) -fprofile-instr-generate $(CXXFLAGS) $< -o main.instr
 
@@ -26,5 +27,6 @@ main_omp_pgo: main.cpp main_omp.instr
 	llvm-profdata merge default.profraw -o main_omp_pgo.profdata
 	$(CXX) -fprofile-instr-use=main_omp_pgo.profdata $(OMP_CXXFLAGS) $< -o $@
 
+main_omp.instr: OPT_LEVEL = 2
 main_omp.instr: main.cpp
 	$(CXX) -fprofile-instr-generate $(OMP_CXXFLAGS) $< -o main_omp.instr
