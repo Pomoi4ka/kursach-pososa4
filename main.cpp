@@ -8,7 +8,6 @@
 #include <omp.h>
 #endif
 
-const float TOLERANCE = 1e-12;
 const size_t PAIR_COUNT = 2;
 const size_t RECT_VERT_COUNT = 4;
 
@@ -39,7 +38,7 @@ struct mat_pivot {
 
 struct comp_ctx {
     std::ofstream *prot;
-    float eps;
+    float eps, tol;
 
     comp_ctx &operator<<(float);
     comp_ctx &operator<<(pointf);
@@ -295,10 +294,10 @@ bool rectf::has_point(pointf a) const
         float xs[rows];
         float &alpha = xs[0], &beta = xs[1];
 
-        bool exist = mat_solve_sys(pivots, es[i], xs, rows, cols, TOLERANCE);
-        if (!exist)                                  continue;
-        if (alpha < -TOLERANCE || beta < -TOLERANCE) continue;
-        if (alpha + beta > 1 + TOLERANCE)            continue;
+        bool exist = mat_solve_sys(pivots, es[i], xs, rows, cols, ctx->tol);
+        if (!exist)                                continue;
+        if (alpha < -ctx->tol || beta < -ctx->tol) continue;
+        if (alpha + beta > 1 + ctx->tol)           continue;
         return true;
     }
     return false;
@@ -462,7 +461,7 @@ bool line_coeff::intersection(line_coeff l, pointf &p)
 
     mat_pivot pivots[rows];
 
-    return mat_solve_sys(pivots, es, (float *)&p, rows, cols, TOLERANCE);
+    return mat_solve_sys(pivots, es, (float *)&p, rows, cols, ctx->tol);
 }
 
 line_coeff line_coeff::from_points(comp_ctx *ctx, pointf p1, pointf p2)
@@ -480,7 +479,7 @@ line_coeff line_coeff::from_points(comp_ctx *ctx, pointf p1, pointf p2)
     mat_pivot pivots[cols];
 
     mat_solve_homogeneous_sys(pivots, es, (float *)&line,
-                              rows, cols, TOLERANCE);
+                              rows, cols, ctx->tol);
     line.ctx = ctx;
     return line;
 }
@@ -611,6 +610,11 @@ static bool read_input_file(const char *path, comp_ctx &ctx, pointf_dynarr &ps)
         return false;
     }
     if (!file_read_number(f, ctx.eps)) {
+        file_problem_err(path, FILE_FMT_ERR);
+        return false;
+    }
+
+    if (!file_read_number(f, ctx.tol)) {
         file_problem_err(path, FILE_FMT_ERR);
         return false;
     }
