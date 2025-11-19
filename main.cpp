@@ -501,20 +501,33 @@ static bool file_read_number(std::ifstream &f, float &x)
     return false;
 }
 
-static void file_problem_err(const char *path)
+enum file_problem {
+    FILE_OPEN_ERR,
+    FILE_FMT_ERR
+};
+
+static void file_problem_err(const char *path, file_problem problem)
 {
-    std::cerr << "ОШИБКА: Проблема с файлом " << path << std::endl;
+    switch (problem) {
+    case FILE_OPEN_ERR:
+        std::cerr << "ОШИБКА: Проблема с файлом " << path << std::endl;
+        break;
+    case FILE_FMT_ERR:
+        std::cerr << "ОШИБКА: неверный формат файла" << std::endl;
+        break;
+    }
 }
+
 
 static bool read_input_file(const char *path, comp_ctx &ctx, pointf_dynarr &ps)
 {
     std::ifstream f(path);
     if (!f.is_open()) {
-        file_problem_err(path);
+        file_problem_err(path, FILE_OPEN_ERR);
         return false;
     }
     if (!file_read_number(f, ctx.eps)) {
-        std::cerr << "ОШИБКА: неверный формат файла" << std::endl;
+        file_problem_err(path, FILE_FMT_ERR);
         return false;
     }
 
@@ -524,8 +537,7 @@ static bool read_input_file(const char *path, comp_ctx &ctx, pointf_dynarr &ps)
         for (size_t i = 0; i < sizeof cs / sizeof *cs; ++i) {
             if (file_read_number(f, cs[i])) continue;
             if (i == 0) return true;
-            std::cerr << "ОШИБКА: неверный формат файла"
-                      << std::endl;
+            file_problem_err(path, FILE_FMT_ERR);
             return false;
         }
         pointf p = {cs[0], cs[1]};
@@ -591,9 +603,8 @@ static void print_verts(rectf_dynarr const &rects, pair_index max)
     for (size_t i = 0; i < PAIR_COUNT; ++i) {
         for (size_t j = 0; j < RECT_VERT_COUNT; ++j) {
             if (j > 0) std::cout << " ";
-            std::cout << "(" << rects.items[max[i]].vs[j].x
-                      << ", " << rects.items[max[i]].vs[j].y
-                      << ")";
+            pointf p = rects.items[max[i]].vs[j];
+            std::cout << "(" << p.x << ", " << p.y << ")";
         }
         std::cout << std::endl;
     }
@@ -616,7 +627,7 @@ int main()
     if (TRACE) {
         prot.open(prot_path);
         if (!prot) {
-            file_problem_err(prot_path);
+            file_problem_err(prot_path, FILE_OPEN_ERR);
             return 1;
         }
         ctx.prot = &prot;
