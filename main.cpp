@@ -63,7 +63,7 @@ struct line_coeff {
     bool intersection(line_coeff, pointf&);
 };
 
-struct rectf_list {
+struct rectf_dynarr {
     typedef rectf item;
 
     item *items;
@@ -78,7 +78,7 @@ struct rectf_list {
     void add(rectf);
 };
 
-struct pointf_list {
+struct pointf_dynarr {
     typedef pointf item;
 
     item *items;
@@ -116,7 +116,7 @@ pointf pointf::sub(pointf a) const
 }
 
 
-void rectf_list::alloc(size_t n) {
+void rectf_dynarr::alloc(size_t n) {
     if (cap > count + n) return;
 
     while (cap <= count + n) {
@@ -133,7 +133,7 @@ void rectf_list::alloc(size_t n) {
     items = new_items;
 }
 
-void rectf_list::add(rectf p) {
+void rectf_dynarr::add(rectf p) {
 #ifdef _OPENMP
     omp_set_lock(&lock);
 #endif
@@ -144,7 +144,7 @@ void rectf_list::add(rectf p) {
 #endif
 }
 
-void pointf_list::alloc(size_t n) {
+void pointf_dynarr::alloc(size_t n) {
     if (cap > count + n) return;
 
     while (cap <= count + n) {
@@ -161,7 +161,7 @@ void pointf_list::alloc(size_t n) {
     items = new_items;
 }
 
-void pointf_list::add(pointf p) {
+void pointf_dynarr::add(pointf p) {
     alloc(1);
     items[count++] = p;
 }
@@ -441,8 +441,8 @@ static float polygon_area(pointf ps[], size_t n)
     return fabsf(sum) * 0.5;
 }
 
-static void add_rect(comp_ctx &c, pointf_list const &ps,
-                     rectf_list &rs, size_t ids[RECT_VERT_COUNT])
+static void add_rect(comp_ctx &c, pointf_dynarr const &ps,
+                     rectf_dynarr &rs, size_t ids[RECT_VERT_COUNT])
 {
     rectf r = {{}, &c};
     size_t n;
@@ -468,7 +468,7 @@ static void add_rect(comp_ctx &c, pointf_list const &ps,
     rs.add(r);
 }
 
-static void find_rects(comp_ctx &ccx, pointf_list const &ps, rectf_list &rs)
+static void find_rects(comp_ctx &ccx, pointf_dynarr const &ps, rectf_dynarr &rs)
 {
 #ifdef _OPENMP
     if (TRACE) {
@@ -506,7 +506,7 @@ static void file_problem_err(const char *path)
     std::cerr << "ОШИБКА: Проблема с файлом " << path << std::endl;
 }
 
-static bool read_input_file(const char *path, comp_ctx &ctx, pointf_list &ps)
+static bool read_input_file(const char *path, comp_ctx &ctx, pointf_dynarr &ps)
 {
     std::ifstream f(path);
     if (!f.is_open()) {
@@ -536,7 +536,7 @@ static bool read_input_file(const char *path, comp_ctx &ctx, pointf_list &ps)
     return true;
 }
 
-static bool find_max_intersect_area(comp_ctx &ctx, rectf_list const &rs,
+static bool find_max_intersect_area(comp_ctx &ctx, rectf_dynarr const &rs,
                                     pair_index ids)
 {
     const size_t MIN_RECT_COUNT = 2;
@@ -584,7 +584,7 @@ static bool find_max_intersect_area(comp_ctx &ctx, rectf_list const &rs,
     return true;
 }
 
-static void print_verts(rectf_list const &rects, pair_index max)
+static void print_verts(rectf_dynarr const &rects, pair_index max)
 {
     std::cout << "Вершины найденной пары прямоугольников с "
               << "максимальной площадью пересечения:" << std::endl;
@@ -605,8 +605,8 @@ int main()
 
     std::ofstream prot;
     comp_ctx ctx = {};
-    pointf_list points = {};
-    rectf_list rects = {};
+    pointf_dynarr points = {};
+    rectf_dynarr rects = {};
     pair_index max;
 
 #ifdef _OPENMP
