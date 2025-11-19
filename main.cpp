@@ -34,16 +34,6 @@ struct comp_ctx {
     short pad;
 
     void func(const char *);
-
-    void ln();
-    void write(const char *);
-    void write(float);
-    void write(int);
-    void write(const float[], size_t);
-    void write(const struct pointf[], size_t);
-    void write(const float mat[], size_t, size_t);
-    void write(struct pointf);
-    void write(struct rectf);
 };
 
 struct pointf {
@@ -125,92 +115,6 @@ pointf pointf::sub(pointf a) const
     return result;
 }
 
-void comp_ctx::ln()
-{
-    if (!TRACE) return;
-    write("\n");
-    pad = level;
-}
-
-void comp_ctx::func(const char *name)
-{
-    if (!TRACE) return;
-    pad = level = 0;
-    write(name);
-    write(":");
-    level = 1;
-    ln();
-}
-
-void comp_ctx::write(const float fs[], size_t n)
-{
-    for (size_t i = 0; i < n; ++i) {
-        if (i > 0) write(", ");
-        write(fs[i]);
-    }
-}
-
-void comp_ctx::write(const pointf ps[], size_t n)
-{
-    for (size_t i = 0; i < n; ++i) {
-        if (i > 0) write(", ");
-        write(ps[i]);
-    }
-}
-
-void comp_ctx::write(pointf p)
-{
-    write("(");
-    write(p.x);
-    write(", ");
-    write(p.y);
-    write(")");
-}
-
-void comp_ctx::write(rectf r)
-{
-    if (!TRACE) return;
-    write("rectf {");
-    level++; ln();
-    write(r.vs, RECT_VERT_COUNT/2); write(","); ln();
-    write(r.vs + RECT_VERT_COUNT/2, RECT_VERT_COUNT/2);
-    level--; ln();
-    write("}");
-}
-
-void comp_ctx::write(const float mat[], size_t rows, size_t cols)
-{
-    if (!TRACE) return;
-    write("matrix [");
-    level++; ln();
-    for (size_t i = 0; i < rows; ++i) {
-        if (i) ln();
-        write("[");
-        for (size_t j = 0; j < cols; ++j) {
-            *prot << std::setw(13);
-            write(mat[cols*i + j]);
-        }
-        write("]");
-    }
-    level--; ln();
-    write("]");
-}
-
-void comp_ctx::write(float a)
-{
-    if (!TRACE) return;
-    for (short i = 0; i < pad; ++i) *prot << "  ";
-    *prot << a;
-    pad = 0;
-}
-
-void comp_ctx::write(const char *text)
-{
-    if (!TRACE) return;
-    for (short i = 0; i < pad; ++i) *prot << "  ";
-    *prot << text;
-    pad = 0;
-}
 
 void rectf_list::alloc(size_t n) {
     if (cap > count + n) return;
@@ -292,11 +196,6 @@ void rectf::clockwisify()
         atan2f(vp[2].y, vp[2].x),
         atan2f(vp[3].y, vp[3].x),
     };
-    ctx->func("rectf::clockwisify");
-    ctx->write("средняя точка = ");
-    ctx->write(mean);
-    ctx->ln();
-    ctx->write(*this);
 
     for (bool finished = false; !finished; ) {
         finished = true;
@@ -307,9 +206,6 @@ void rectf::clockwisify()
             swap(&as[i-1], &as[i], sizeof *as);
         }
     }
-    ctx->write(" -> ");
-    ctx->write(*this);
-    ctx->ln();
 }
 
 bool rectf::has_point(pointf a) const
@@ -328,8 +224,6 @@ bool rectf::has_point(pointf a) const
             vs[2].y - vs[0].y, vs[3].y - vs[0].y, a.y - vs[0].y,
         }
     };
-
-    ctx->func("rectf::has_point");
 
     for (size_t i = 0; i < mats; ++i) {
         float xs[rows];
@@ -391,23 +285,15 @@ static size_t mat_reduce(float es[], size_t rows, size_t cols, float tol)
 static bool mat_solve_sys(comp_ctx &ctx, float es[], float ans[], size_t rows,
                           size_t cols, float tol)
 {
-    ctx.func("matrixf::solve_sys");
-    ctx.write(es, rows, cols); ctx.ln();
     mat_reduce(es, rows, cols, tol);
-    ctx.write("Результат: "); ctx.write(es, rows, cols); ctx.ln();
     for (size_t i = 0; i < rows; ++i) {
         float b = es[i * cols + cols - 1];
         float sum = 0;
         for (size_t j = 0; j < cols - 1; sum += es[cols * i + j++])
             ;;
-        if (fabsf(sum) <= tol && fabsf(b) > tol) {
-            ctx.write("Есть противоречия => решений нет");
-            ctx.ln();
-            return false;
-        }
+        if (fabsf(sum) <= tol && fabsf(b) > tol) return false;
         ans[i] = b;
     }
-    ctx.write("Решение: "); ctx.write(ans, rows); ctx.ln();
     return true;
 }
 
@@ -637,17 +523,13 @@ static bool read_input_file(const char *path, comp_ctx &ctx, pointf_list &ps)
 
         for (size_t i = 0; i < sizeof cs / sizeof *cs; ++i) {
             if (file_read_number(f, cs[i])) continue;
-            if (i == 0) break;
+            if (i == 0) return true;
             std::cerr << "ОШИБКА: неверный формат файла"
                       << std::endl;
             return false;
         }
         pointf p = {cs[0], cs[1]};
 
-        ctx.func("read_input_file");
-        ctx.write("Прочитана точка ");
-        ctx.write(p);
-        ctx.ln();
         ps.add(p);
     }
 
