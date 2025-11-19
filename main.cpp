@@ -634,8 +634,8 @@ static bool read_input_file(const char *path, comp_ctx &ctx, pointf_dynarr &ps)
     return true;
 }
 
-static bool find_max_intersect_area(comp_ctx &ctx, rectf_dynarr const &rs,
-                                    pair_index ids)
+static float find_max_intersect_area(comp_ctx &ctx, rectf_dynarr const &rs,
+                                     pair_index ids)
 {
     const size_t MIN_RECT_COUNT = 2;
     if (rs.count < MIN_RECT_COUNT) {
@@ -643,7 +643,7 @@ static bool find_max_intersect_area(comp_ctx &ctx, rectf_dynarr const &rs,
             "невозможно найти пару прямоугольников: "
                   << rs.count << " элементов ("
                   << MIN_RECT_COUNT << " минимум)" << std::endl;
-        return false;
+        return NAN;
     }
 
     float max_area = FLT_MIN;
@@ -690,7 +690,7 @@ static bool find_max_intersect_area(comp_ctx &ctx, rectf_dynarr const &rs,
 #endif
         }
     }
-    return true;
+    return max_area;
 }
 
 static void print_verts(rectf_dynarr const &rects, pair_index max)
@@ -710,6 +710,8 @@ int main()
 {
     const char *input = "input.txt", *prot_path = "protocol.txt";
 
+    float max_area;
+    int result = 0;
     std::ofstream prot;
     comp_ctx ctx = {};
     pointf_dynarr points = {};
@@ -729,13 +731,22 @@ int main()
         ctx.prot = &prot;
     }
 
-    if (!read_input_file(input, ctx, points)) return 1;
+    if (!read_input_file(input, ctx, points)) {
+        result = 1;
+        goto end;
+    }
     find_rects(ctx, points, rects);
 
-    if (!find_max_intersect_area(ctx, rects, max)) return 1;
+    max_area = find_max_intersect_area(ctx, rects, max);
+    if (isnan(max_area)) {
+        result = 1;
+        goto end;
+    }
     print_verts(rects, max);
+    std::cout << "Площадь равна " << max_area << std::endl;
 
+ end:
     delete[] rects.items;
     delete[] points.items;
-    return 0;
+    return result;
 }
