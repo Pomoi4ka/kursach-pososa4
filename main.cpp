@@ -296,9 +296,9 @@ bool rectf::has_point(pointf a) const
         float &alpha = xs[0], &beta = xs[1];
 
         bool exist = mat_solve_sys(pivots, es[i], xs, rows, cols, TOLERANCE);
-        if (!exist)                                continue;
-        if (alpha < -ctx->eps || beta < -ctx->eps) continue;
-        if (alpha + beta > 1 + ctx->eps)           continue;
+        if (!exist)                                  continue;
+        if (alpha < -TOLERANCE || beta < -TOLERANCE) continue;
+        if (alpha + beta > 1 + TOLERANCE)            continue;
         return true;
     }
     return false;
