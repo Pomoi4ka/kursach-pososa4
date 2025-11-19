@@ -20,16 +20,22 @@ typedef int (*compar_f)(void *, const void *, const void *);
 struct comp_ctx;
 struct pointf;
 struct rectf;
+struct mat_pivot;
 
 static void swap(void *x, void *y, size_t n);
 static void quicksort(void *xs, size_t x_size, size_t x_count,
                       compar_f cmp, void *cmp_ctx);
-static bool mat_solve_homogeneous_sys(comp_ctx &ctx, float es[], float ans[],
-                                      size_t rows, size_t cols, float tol);
-static bool mat_solve_sys(comp_ctx &ctx, float es[], float ans[],
+static bool mat_solve_homogeneous_sys(mat_pivot pivot_storage[], float es[],
+                                      float ans[], size_t rows, size_t cols,
+                                      float tol);
+static bool mat_solve_sys(mat_pivot pivot_storage[], float es[], float ans[],
                           size_t rows, size_t cols, float tol);
 
 struct ln {} ln;
+
+struct mat_pivot {
+    size_t row, col;
+};
 
 struct comp_ctx {
     std::ofstream *prot;
@@ -283,11 +289,13 @@ bool rectf::has_point(pointf a) const
         }
     };
 
+    mat_pivot pivots[rows];
+
     for (size_t i = 0; i < mats; ++i) {
         float xs[rows];
         float &alpha = xs[0], &beta = xs[1];
 
-        bool exist = mat_solve_sys(*ctx, es[i], xs, rows, cols, TOLERANCE);
+        bool exist = mat_solve_sys(pivots, es[i], xs, rows, cols, TOLERANCE);
         if (!exist)                                continue;
         if (alpha < -ctx->eps || beta < -ctx->eps) continue;
         if (alpha + beta > 1 + ctx->eps)           continue;
@@ -311,9 +319,15 @@ static size_t mat_pivot_row(const float es[], size_t rows, size_t cols,
     return mi;
 }
 
-static size_t mat_reduce(float es[], size_t rows, size_t cols, float tol)
+struct mat_reduce_result {
+    unsigned npivots;
+    unsigned occupied_cols;
+};
+
+static mat_reduce_result mat_reduce(mat_pivot pivots[], float es[],
+                                    size_t rows, size_t cols, float tol)
 {
-    size_t pivots = 0;
+    mat_reduce_result result = {};
 
     // Я бы мог запихнуть es, rows, cols в структуру, но компилятор слишком
     // тупой чтобы увидеть, что у меня размер массивов весзде известен и
@@ -334,16 +348,19 @@ static size_t mat_reduce(float es[], size_t rows, size_t cols, float tol)
                 es[i * cols + j] -= factor * es[row * cols + j];
             }
         }
-        ++row, ++pivots;
+        mat_pivot p = {row, col};
+        pivots[result.npivots++] = p;
+        result.occupied_cols |= 1<<col;
+        ++row;
     }
 
-    return pivots;
+    return result;
 }
 
-static bool mat_solve_sys(comp_ctx &ctx, float es[], float ans[], size_t rows,
-                          size_t cols, float tol)
+static bool mat_solve_sys(mat_pivot pivot_storage[], float es[], float ans[],
+                          size_t rows, size_t cols, float tol)
 {
-    mat_reduce(es, rows, cols, tol);
+    mat_reduce(pivot_storage, es, rows, cols, tol);
     for (size_t i = 0; i < rows; ++i) {
         float b = es[i * cols + cols - 1];
         float sum = 0;
@@ -355,21 +372,24 @@ static bool mat_solve_sys(comp_ctx &ctx, float es[], float ans[], size_t rows,
     return true;
 }
 
-static bool mat_solve_homogeneous_sys(comp_ctx &ctx, float es[], float ans[],
-                                      size_t rows, size_t cols, float tol)
+static bool mat_solve_homogeneous_sys(mat_pivot pivot_storage[], float es[],
+                                      float ans[], size_t rows, size_t cols,
+                                      float tol)
 {
-    int pivots = mat_reduce(es, rows, cols, tol);
-    int free_cols = cols - pivots;
+    mat_reduce_result result = mat_reduce(pivot_storage, es, rows, cols, tol);
 
     for (size_t i = 0; i < cols; ++i) ans[i] = 0.0;
 
-    for (size_t i = cols - free_cols; i < cols; ++i) {
+    for (size_t i = 0; i < cols; ++i) {
+        if (result.occupied_cols&(1<<i)) continue;
         ans[i] = 1.0;
-        for (int j = 0; j < pivots; ++j)
-            ans[j] += -es[cols * j + i];
+        for (unsigned j = 0; j < result.npivots; ++j) {
+            mat_pivot &pivot = pivot_storage[j];
+            ans[pivot.col] += -es[cols * pivot.row + i];
+        }
     }
 
-    return !free_cols;
+    return result.occupied_cols;
 }
 
 static void swap(void *x, void *y, size_t n)
@@ -440,7 +460,9 @@ bool line_coeff::intersection(line_coeff l, pointf &p)
         l.k, l.b, -l.c
     };
 
-    return mat_solve_sys(*ctx, es, (float *)&p, rows, cols, TOLERANCE);
+    mat_pivot pivots[rows];
+
+    return mat_solve_sys(pivots, es, (float *)&p, rows, cols, TOLERANCE);
 }
 
 line_coeff line_coeff::from_points(comp_ctx *ctx, pointf p1, pointf p2)
@@ -455,7 +477,10 @@ line_coeff line_coeff::from_points(comp_ctx *ctx, pointf p1, pointf p2)
         p2.x, p2.y, 1,
     };
 
-    mat_solve_homogeneous_sys(*ctx, es, (float *)&line, rows, cols, TOLERANCE);
+    mat_pivot pivots[cols];
+
+    mat_solve_homogeneous_sys(pivots, es, (float *)&line,
+                              rows, cols, TOLERANCE);
     line.ctx = ctx;
     return line;
 }
