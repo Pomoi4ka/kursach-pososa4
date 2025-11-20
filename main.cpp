@@ -308,8 +308,9 @@ static size_t mat_pivot_row(const float es[], size_t rows, size_t cols,
     size_t max_index = row, i;
 
     for (i = row; i < rows; ++i) {
-        float elem = es[i * cols + col];
-        if (elem > es[i * cols + max_index])
+        float elem = fabsf(es[i * cols + col]);
+        float max_elem = fabsf(es[i * cols + max_index]);
+        if (elem > max_elem)
             max_index = i;
     }
     return max_index;
