@@ -2,7 +2,6 @@
 #include <iomanip>
 #include <cmath>
 #include <fstream>
-#include <cfloat>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -306,16 +305,14 @@ bool rectf::has_point(pointf a) const
 static size_t mat_pivot_row(const float es[], size_t rows, size_t cols,
                             size_t row, size_t col)
 {
-    size_t mi, i;
-    float max = FLT_MIN;
+    size_t max_index = row, i;
 
-    for (mi = i = row; i < rows; ++i) {
-        float e = es[cols * i + col];
-        if (fabsf(e) <= max) continue;
-        max = e;
-        mi = i;
+    for (i = row; i < rows; ++i) {
+        float elem = es[i * cols + col];
+        if (elem > es[i * cols + max_index])
+            max_index = i;
     }
-    return mi;
+    return max_index;
 }
 
 struct mat_reduce_result {
@@ -650,7 +647,7 @@ static float find_max_intersect_area(comp_ctx &ctx, rectf_dynarr const &rs,
         return NAN;
     }
 
-    float max_area = FLT_MIN;
+    float max_area = 0;
 
     ids[0] = 0;
     ids[1] = 1;
