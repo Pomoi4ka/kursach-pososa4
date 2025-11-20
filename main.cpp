@@ -741,7 +741,7 @@ int main()
     find_rects(ctx, points, rects);
 
     max_area = find_max_intersect_area(ctx, rects, max);
-    if (isnan(max_area)) {
+    if (std::isnan(max_area)) {
         result = 1;
         goto end;
     }
