@@ -1,11 +1,18 @@
 CXX=clang++
 OPT_LEVEL=3
-OMP_CXXFLAGS=-O$(OPT_LEVEL) -march=native -mavx2 -fopenmp -ggdb -Wall -Wextra -pedantic -std=c++98
-CXXFLAGS=-O$(OPT_LEVEL) -march=native -mavx2 -ggdb -Wall -Wextra -pedantic -std=c++98
+STANDART=c++98
 
-all: main main_omp
+OMP_CXXFLAGS=-O$(OPT_LEVEL) -march=native -mavx2 -fopenmp -ggdb -Wall -Wextra -pedantic -std=$(STANDART)
+CXXFLAGS=-O$(OPT_LEVEL) -march=native -mavx2 -ggdb -Wall -Wextra -pedantic -std=$(STANDART)
+
+all: visual main main_omp
 
 pgo: main_pgo main_omp_pgo
+
+visual: STANDART=c++17
+visual: OPT_LEVEL=0
+visual: visual.cpp main.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< -lraylib
 
 main: main.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $<
