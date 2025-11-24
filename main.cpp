@@ -578,7 +578,7 @@ static bool file_read_number(std::ifstream &f, float &x)
     f >> std::noskipws;
     while (!f.eof()) {
         if (f >> x) return true;
-        f.clear(), f.get();
+        if (f.clear(), f.get() == '\n') return false;
     }
     return false;
 }
@@ -600,10 +600,10 @@ static void file_problem_err(const char *path, file_problem problem)
     }
 }
 
-
 static bool read_input_file(const char *path, comp_ctx &ctx, pointf_dynarr &ps)
 {
     std::ifstream f(path);
+
     if (!f.is_open()) {
         file_problem_err(path, FILE_OPEN_ERR);
         return false;
@@ -619,19 +619,21 @@ static bool read_input_file(const char *path, comp_ctx &ctx, pointf_dynarr &ps)
     }
 
     while (!f.eof()) {
+        size_t i;
         float cs[2];
+        const size_t n = sizeof cs / sizeof *cs;
 
-        for (size_t i = 0; i < sizeof cs / sizeof *cs; ++i) {
-            if (file_read_number(f, cs[i])) continue;
-            if (i == 0) goto done;
-            file_problem_err(path, FILE_FMT_ERR);
-            return false;
+        for (i = 0; !f.eof(); ) {
+            float val;
+            if (file_read_number(f, val)) {
+                if (i < n) cs[i++] = val;
+            } else break;
         }
+        if (i != n) continue;
         pointf p = {cs[0], cs[1]};
         ps.add(p);
     }
 
- done:
     ctx << "Прочитано " << ps.count << " точек" << ln;
 
     return true;
