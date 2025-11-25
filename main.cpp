@@ -19,6 +19,7 @@ struct comp_ctx;
 struct pointf;
 struct rectf;
 struct mat_pivot;
+struct line_coeff;
 
 static void swap(void *x, void *y, size_t n);
 static void quicksort(void *xs, size_t x_size, size_t x_count,
@@ -29,8 +30,6 @@ static bool mat_solve_homogeneous_sys(mat_pivot pivot_storage[], float es[],
 static bool mat_solve_sys(mat_pivot pivot_storage[], float es[], float ans[],
                           size_t rows, size_t cols, float tol);
 
-struct ln {} ln;
-
 struct mat_pivot {
     size_t row, col;
 };
@@ -39,12 +38,12 @@ struct comp_ctx {
     std::ofstream *prot;
     float eps, tol;
 
-    comp_ctx &operator<<(float);
-    comp_ctx &operator<<(pointf);
-    comp_ctx &operator<<(rectf);
-    comp_ctx &operator<<(const char *);
-    comp_ctx &operator<<(struct ln);
-    comp_ctx &operator<<(size_t);
+    comp_ctx const &operator<<(float) const;
+    comp_ctx const &operator<<(pointf) const;
+    comp_ctx const &operator<<(rectf) const;
+    comp_ctx const &operator<<(const char *) const;
+    comp_ctx const &operator<<(size_t) const;
+    comp_ctx const &operator<<(line_coeff line) const;
 };
 
 struct pointf {
@@ -176,14 +175,14 @@ void pointf_dynarr::add(pointf p) {
     items[count++] = p;
 }
 
-comp_ctx &comp_ctx::operator<<(float f)
+comp_ctx const &comp_ctx::operator<<(float f) const
 {
     if (!TRACE) return *this;
     *prot << f;
     return *this;
 }
 
-comp_ctx &comp_ctx::operator<<(size_t x)
+comp_ctx const &comp_ctx::operator<<(size_t x) const
 {
     if (!TRACE) return *this;
     *prot << x;
@@ -195,14 +194,14 @@ std::ostream &operator<<(std::ostream &s, pointf p)
     return s << "(" << p.x << ", " << p.y << ")";
 }
 
-comp_ctx &comp_ctx::operator<<(pointf p)
+comp_ctx const &comp_ctx::operator<<(pointf p) const
 {
     if (!TRACE) return *this;
     *prot << p;
     return *this;
 }
 
-comp_ctx &comp_ctx::operator<<(rectf r)
+comp_ctx const &comp_ctx::operator<<(rectf r) const
 {
     if (!TRACE) return *this;
     *this << "{";
@@ -214,17 +213,18 @@ comp_ctx &comp_ctx::operator<<(rectf r)
     return *this;
 }
 
-comp_ctx &comp_ctx::operator<<(const char *cstr)
+comp_ctx const &comp_ctx::operator<<(line_coeff line) const
+{
+    if (!TRACE) return *this;
+    return *this << "(" << line.k << ")x + "
+                 << "(" << line.b << ")y + "
+                 << "(" << line.c << ") = 0";
+}
+
+comp_ctx const &comp_ctx::operator<<(const char *cstr) const
 {
     if (!TRACE) return *this;
     *prot << cstr;
-    return *this;
-}
-
-comp_ctx &comp_ctx::operator<<(struct ln)
-{
-    if (!TRACE) return *this;
-    *prot << std::endl;
     return *this;
 }
 
@@ -485,32 +485,35 @@ line_coeff line_coeff::from_points(comp_ctx *ctx, pointf p1, pointf p2)
 
 int rectf::intersection_points(rectf const &a, pointf ps[]) const
 {
-    int n = 0;
-    line_coeff ls[2][RECT_VERT_COUNT];
+    int count = 0;
+    const rectf *rs[] = {this, &a};
+    const size_t n = sizeof rs / sizeof *rs;
+    line_coeff ls[n][RECT_VERT_COUNT];
 
-    for (size_t i = 0; i < RECT_VERT_COUNT; ++i) {
-        pointf p1, p2;
-        p1 = vs[i];
-        p2 = vs[(i + 1) % RECT_VERT_COUNT];
-        ls[0][i] = line_coeff::from_points(ctx, p1, p2);
-
-        p1 = a.vs[i];
-        p2 = a.vs[(i + 1) % RECT_VERT_COUNT];
-        ls[1][i] = line_coeff::from_points(ctx, p1, p2);
+    for (size_t i = 0; i < n; ++i) {
+        *ctx << "Прямые для " << *this << ":\n";
+        for (size_t j = 0; j < RECT_VERT_COUNT; ++j) {
+            pointf p1, p2;
+            p1 = rs[i]->vs[j];
+            p2 = rs[i]->vs[(j + 1) % RECT_VERT_COUNT];
+            ls[i][j] = line_coeff::from_points(ctx, p1, p2);
+            *ctx << "   [" << p1 << ", " << p2 << "] -> "
+                 << ls[i][j] << "\n";
+        }
     }
 
     for (size_t i = 0; i < RECT_VERT_COUNT; ++i) {
-        if (has_point(a.vs[i])) ps[n++] = a.vs[i];
-        if (a.has_point(vs[i])) ps[n++] = vs[i];
+        if (has_point(a.vs[i])) ps[count++] = a.vs[i];
+        if (a.has_point(vs[i])) ps[count++] = vs[i];
 
         for (size_t j = 0; j < RECT_VERT_COUNT; ++j) {
             pointf p;
             if (!ls[0][i].intersection(ls[1][j], p)) continue;
             if (!has_point(p) || !a.has_point(p)) continue;
-            ps[n++] = p;
+            ps[count++] = p;
         }
     }
-    return n;
+    return count;
 }
 
 static float polygon_area(pointf ps[], size_t n)
@@ -540,13 +543,17 @@ static void add_rect(comp_ctx &c, pointf_dynarr const &ps,
 
     const float eps = c.eps;
 
-    if (fabsf(p12.len() - p23.len()) <= eps) return;
+    if (fabsf(p12.len() - p23.len()) <= eps) goto exclude;
 
-    if (p12.cosine(p14) >= eps) return;
-    if (p23.cosine(p43) >= eps) return;
-    if (p14.cosine(p43) >= eps) return;
-    if (p12.cosine(p23) >= eps) return;
+    if (p12.cosine(p14) >= eps) goto exclude;
+    if (p23.cosine(p43) >= eps) goto exclude;
+    if (p14.cosine(p43) >= eps) goto exclude;
+    if (p12.cosine(p23) >= eps) goto exclude;
+
     rs.add(r);
+    return;
+ exclude:
+    c << "Точки " << r << " не образуют прямоугольник\n";
 }
 
 static void find_rects(comp_ctx &ccx, pointf_dynarr const &ps, rectf_dynarr &rs)
@@ -570,7 +577,7 @@ static void find_rects(comp_ctx &ccx, pointf_dynarr const &ps, rectf_dynarr &rs)
     case 1: break;
     default: ccx << "ов"; break;
     }
-    ccx << ln;
+    ccx << "\n";
 }
 
 static bool file_read_number(std::ifstream &f, float &x)
@@ -634,7 +641,7 @@ static bool read_input_file(const char *path, comp_ctx &ctx, pointf_dynarr &ps)
         ps.add(p);
     }
 
-    ctx << "Прочитано " << ps.count << " точек" << ln;
+    ctx << "Прочитано " << ps.count << " точек\n";
 
     return true;
 }
@@ -675,12 +682,12 @@ static float find_max_intersect_area(comp_ctx &ctx, rectf_dynarr const &rs,
             omp_set_lock(&lock);
 #endif
             ctx << "Для прямоугольников " << a << " и " << b
-                << " были найдены следующие точки пересечения: " << ln;
+                << " были найдены следующие точки пересечения: \n";
             for (int i = 0; i < n; ++i) {
-                if (i > 0) ctx << "," << ln;
+                if (i > 0) ctx << ",\n";
                 ctx << "  " << points[i];
             }
-            ctx << ln << "Площадь полигона состоящего из этих точек: "
+            ctx << "\nПлощадь полигона состоящего из этих точек: "
                 << area;
 
             if (area > max_area) {
@@ -689,7 +696,7 @@ static float find_max_intersect_area(comp_ctx &ctx, rectf_dynarr const &rs,
                 ids[0] = i;
                 ids[1] = j;
             }
-            ctx << ln;
+            ctx << "\n";
 #ifdef _OPENMP
             omp_unset_lock(&lock);
 #endif
