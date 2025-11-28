@@ -750,6 +750,11 @@ int main()
     find_rects(ctx, points, rects);
 
     max_area = find_max_intersect_area(ctx, rects, max);
+    if (max_area < ctx.tol) {
+        std::cerr << "Неудалось найти пересекающуюся пару прямоугольников" << std::endl;
+        goto end;
+    }
+
     if (std::isnan(max_area)) {
         result = 1;
         goto end;
